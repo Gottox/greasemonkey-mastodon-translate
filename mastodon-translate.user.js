@@ -9,82 +9,129 @@
 // ==/UserScript==
 
 const TAG = "__mastodon_translation_enabled";
-const BUTTON_TAG = "__mastodon_translation_translator_button";
 const CONTAINER_TAG = "__mastodon_translation_translator_container";
 const KEY_API_KEY = "__mastodon_translation_translator_api_key";
 const KEY_TARGET_LANGUAGE = "__mastodon_translation_translator_target_language";
 
+
+const contextMenu = document.createElement('div');
+contextMenu.style = `
+	position:absolute;
+	left:0;
+	top:0;
+	background: black;
+	color: white;
+	display: none;
+`
+contextMenu.innerHTML = `
+	DeepL Key<br>
+  <input type="text" name="KEY"><br>
+  Prefered Language<br>
+	<select name="LANG">
+    <option value="DE">German</option>
+    <option value="EN">English</option>
+    <option value="ES">Spanish</option>
+    <option value="FR">French</option>
+    <option value="IT">Italian</option>
+    <option value="JA">Japanese</option>
+    <option value="NL">Dutch</option>
+    <option value="PL">Polish</option>
+	</select><br>
+  <button name="OK">OK</botton>
+`;
+
+const ok_button = contextMenu.querySelector("[name=OK]");
+ok_button.onclick = (ev) => {
+	contextMenu.style.display = "none";
+}
+
+document.body.appendChild(contextMenu);
+
 function augment(e) {
-	const container = document.createElement("span");
-	container.dataset[CONTAINER_TAG] = "true";
-	container.style.whiteSpace = "pre-wrap";
-
-
-	container.innerHTML = `
-    <a href="javascript:void(0)" data-${BUTTON_TAG}="true">Translate</button>
-  `.trim();
-	container.onclick = handle_click;
-
-	e.appendChild(container);
-	e.dataset[TAG] = "true";
+  const actionbar = e.querySelector(".status__action-bar");
+  if (actionbar === null) {
+    return;
+  }
+  // status__action-bar__button star-icon icon-button
+  const button = document.createElement("button");
+  button.className = `icon-button ${TAG}`;
+  button.innerHTML = '<i class="fa fa-language fa-fw" aria-hidden="true"></i>';
+  button.title = "Translate";
+  button.onclick = handle_click;
+  //button.oncontextmenu = handle_contextmenu;
+  actionbar.insertBefore(button, actionbar.querySelector('.status__action-bar__dropdown'))
+  e.dataset[TAG] = "true";
 }
 
-async function translate(text, cb) {
-	console.log(GM);
-	let apiKey = await GM.getValue(KEY_API_KEY, null);
-	if (apiKey === null) {
-		apiKey = prompt("DeepL API Key", "");
-		await GM.setValue(KEY_API_KEY, apiKey);
-	}
-	let targetLanguage = await GM.getValue(KEY_TARGET_LANGUAGE, null);
-	if (targetLanguage === null) {
-		targetLanguage = prompt("Target Language", "EN");
-		await GM.setValue(KEY_TARGET_LANGUAGE, targetLanguage);
-	}
-
-	try {
-		const result = await new Promise((res, rej) => {
-			const r = new XMLHttpRequest();
-			r.open("POST", "https://api-free.deepl.com/v2/translate", true);
-			r.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-			r.setRequestHeader("Authorization", `DeepL-Auth-Key ${apiKey}`)
-			r.onreadystatechange = function() {
-				if (r.readyState != 4) return;
-				if (r.status != 200) {
-					return rej(r)
-				}
-				res(JSON.parse(r.responseText));
-			};
-			r.send(`text=${encodeURIComponent(text)}&target_lang=${encodeURIComponent(targetLanguage)}`);
-		});
-		cb(result);
-	} catch (e) {
-		console.log(e);
-	}
+async function translate(text) {
+  let apiKey = await GM.getValue(KEY_API_KEY, null);
+  if (apiKey === null) {
+  	apiKey = prompt("DeepL API Key", "");
+    await GM.setValue(KEY_API_KEY, apiKey);
+  }
+  let targetLanguage = await GM.getValue(KEY_TARGET_LANGUAGE, null);
+  if (targetLanguage === null) {
+  	targetLanguage = prompt("Target Language", "EN");
+    await GM.setValue(KEY_TARGET_LANGUAGE, targetLanguage);
+  }
+  //return {translations: [ { text: "123" }]};
+  try {
+	  const result = await new Promise((res, rej) => {
+      const r = new XMLHttpRequest();
+      r.open("POST", "https://api-free.deepl.com/v2/translate", true);
+      r.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+      r.setRequestHeader("Authorization", `DeepL-Auth-Key ${apiKey}`)
+      r.onreadystatechange = function () {
+        if (r.readyState != 4) return;
+        if (r.status != 200) {
+          return rej(r)
+        }
+        res(JSON.parse(r.responseText));
+      };
+      r.send(`text=${encodeURIComponent(text)}&target_lang=${encodeURIComponent(targetLanguage)}`);
+    });
+    return result;
+  } catch (e) {
+  	console.log(e);
+  }
 }
+function handle_contextmenu(ev) {
+  ev.stopPropagation();
+  ev.preventDefault();
 
+  console.log(ev);
+  contextMenu.style.display = "block";
+  contextMenu.style.left = `${ev.pageX}px`;
+  contextMenu.style.top = `${ev.pageY}px`;
+  return false;
+}
 function handle_click(ev) {
-	if (!ev.target.dataset[BUTTON_TAG]) {
-		return false;
-	}
-	console.log(ev);
-	ev.stopPropagation();
-	ev.preventDefault();
-
-	let container = ev.target;
-	console.log(container, container.dataset[CONTAINER_TAG]);
-	while (container && !container.dataset[CONTAINER_TAG]) {
-		container = container.parentElement;
-	}
-	const translatable = container.parentElement;
-	const text = translatable.innerText;
-
-	container.innerHTML = "";
-	translate(text, (result) => {
-		container.innerText = result.translations[0].text;
-	});
-
-	return false
+  ev.stopPropagation();
+  ev.preventDefault();
+  
+  let container = ev.target;
+  while(container && !container.dataset[TAG]) {
+    if (container.onclick == handle_click) {
+    	container.style.display = "none";
+    }
+  	container = container.parentElement;
+  }
+  
+  async function run() {
+    for (const translatable of container.querySelectorAll(".translate")) {
+      console.log(translatable);
+  		const text = translatable.innerText;
+  
+  		const result = await translate(text);
+    	const elem = document.createElement("span");
+    	elem.innerText = result.translations[0].text;
+    
+    	translatable.appendChild(elem);
+    }
+  }
+  run();
+  
+  return false
 }
 
 if (!document.getElementById("mastodon")) {
@@ -92,17 +139,11 @@ if (!document.getElementById("mastodon")) {
 }
 
 setInterval(() => {
-	const translate_list = Array.from(document.querySelectorAll("#mastodon .translate")).filter(x => x.dataset[TAG] === undefined)
-	for (const translate of translate_list) {
-		augment(translate);
-	}
+	const translate_list = Array.from(document.querySelectorAll("#mastodon .status__wrapper"))
+  	.filter(x=>x.getElementsByClassName(TAG).length === 0)
+  for (const translate of translate_list) {
+  	augment(translate);
+  }
 }, 1000);
 
-const clearButton = document.createElement("button");
 
-clearButton.innerHTML = "Clear Mastodon Translations Settings";
-clearButton.onclick = () => {
-	GM.deleteValue(KEY_API_KEY)
-	GM.deleteValue(KEY_TARGET_LANGUAGE)
-};
-document.body.appendChild(clearButton);
