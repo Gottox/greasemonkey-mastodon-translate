@@ -5,6 +5,7 @@
 // @grant    GM.getValue
 // @grant    GM.setValue
 // @grant    GM.deleteValue
+// @grant    GM.xmlHttpRequest
 // @run-at   document-end
 // ==/UserScript==
 
@@ -77,18 +78,24 @@ async function translate(text) {
   //return {translations: [ { text: "123" }]};
   try {
 	  const result = await new Promise((res, rej) => {
-      const r = new XMLHttpRequest();
-      r.open("POST", "https://api-free.deepl.com/v2/translate", true);
-      r.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-      r.setRequestHeader("Authorization", `DeepL-Auth-Key ${apiKey}`)
-      r.onreadystatechange = function () {
-        if (r.readyState != 4) return;
-        if (r.status != 200) {
-          return rej(r)
+
+      GM.xmlHttpRequest({
+        method: "POST",
+        url: "https://api-free.deepl.com/v2/translate",
+        data: `text=${encodeURIComponent(text)}&target_lang=${encodeURIComponent(targetLanguage)}`,
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Authorization": `DeepL-Auth-Key ${apiKey}`
+        },
+        onreadystatechange: function (r) {
+          if (r.readyState != 4) return;
+          if (r.status != 200) {
+            return rej(r)
+          }
+          res(JSON.parse(r.responseText));
         }
-        res(JSON.parse(r.responseText));
-      };
-      r.send(`text=${encodeURIComponent(text)}&target_lang=${encodeURIComponent(targetLanguage)}`);
+      });
+
     });
     return result;
   } catch (e) {
