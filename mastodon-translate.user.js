@@ -130,7 +130,8 @@ function handle_click(ev) {
   		const text = translatable.innerText;
   
   		const result = await translate(text);
-    	const elem = document.createElement("span");
+    	const elem = document.createElement("div");
+    	elem.style = "border: 1px solid white !important";
     	elem.innerText = result.translations[0].text;
     
     	translatable.appendChild(elem);
