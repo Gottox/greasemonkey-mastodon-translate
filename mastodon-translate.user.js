@@ -38,7 +38,7 @@ contextMenu.innerHTML = `
     <option value="NL">Dutch</option>
     <option value="PL">Polish</option>
 	</select><br>
-  <button name="OK">OK</botton>
+  <button name="OK">OK</button>
 `;
 
 const ok_button = contextMenu.querySelector("[name=OK]");
